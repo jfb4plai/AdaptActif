@@ -28,7 +28,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
 }
 
 async function removeTextFromImage(base64, mimeType, apiKey) {
-  const url = `${BASE}/gemini-2.5-flash-preview-image-generation:generateContent?key=${apiKey}`
+  const url = `${BASE}/gemini-2.0-flash-exp:generateContent?key=${apiKey}`
   const payload = {
     contents: [{
       parts: [
