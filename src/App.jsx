@@ -8,7 +8,6 @@ import { useAdaptation } from './hooks/useAdaptation.js'
 
 export default function App() {
   const [screen, setScreen] = useState('upload')
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_key') ?? '')
   const [selectedProfiles, setSelectedProfiles] = useState(['dys'])
   const [advancedOptions, setAdvancedOptions] = useState({})
 
@@ -18,14 +17,9 @@ export default function App() {
     runAdaptation, updateSlideText,
   } = useAdaptation(rawSlides, selectedProfiles, advancedOptions)
 
-  function handleGeminiKey(key) {
-    setGeminiKey(key)
-    localStorage.setItem('gemini_key', key)
-  }
-
   async function handleStartAdaptation() {
     setScreen('preview')
-    await runAdaptation(geminiKey)
+    await runAdaptation()
   }
 
   return (
@@ -38,8 +32,6 @@ export default function App() {
       <main className="max-w-5xl mx-auto px-4 py-8">
         {screen === 'upload' && (
           <UploadScreen
-            geminiKey={geminiKey}
-            onGeminiKey={handleGeminiKey}
             onFileParsed={parsePdf}
             parsing={parsing}
             slideCount={rawSlides.length}

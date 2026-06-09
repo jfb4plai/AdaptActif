@@ -6,7 +6,7 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
   const [adapting, setAdapting] = useState(false)
   const [error, setError] = useState(null)
 
-  const runAdaptation = useCallback(async (geminiKey) => {
+  const runAdaptation = useCallback(async () => {
     setAdapting(true)
     setError(null)
     const total = rawSlides.length * (1 + selectedProfiles.length)
