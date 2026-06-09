@@ -27,14 +27,15 @@ export async function loadPdf(file) {
  * @param {number} scale - résolution (1.5 = bonne qualité)
  * @returns {Promise<string>} data URL
  */
-export async function pageToImageDataUrl(page, scale = 1.5) {
+export async function pageToImageDataUrl(page, scale = 1.2) {
   const viewport = page.getViewport({ scale })
   const canvas = document.createElement('canvas')
   canvas.width = viewport.width
   canvas.height = viewport.height
   const ctx = canvas.getContext('2d')
   await page.render({ canvasContext: ctx, viewport }).promise
-  return canvas.toDataURL('image/png')
+  // JPEG 85% quality — réduit la taille de ~5x vs PNG (limite Vercel 4.5MB)
+  return canvas.toDataURL('image/jpeg', 0.85)
 }
 
 /**
@@ -68,9 +69,9 @@ export async function extractSlides(file) {
   const slides = []
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
-    const viewport = page.getViewport({ scale: 1.5 })
+    const viewport = page.getViewport({ scale: 1.2 })
     const [imageDataUrl, textContent] = await Promise.all([
-      pageToImageDataUrl(page, 1.5),
+      pageToImageDataUrl(page, 1.2),
       page.getTextContent(),
     ])
     slides.push({

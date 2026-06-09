@@ -22,10 +22,19 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageDataUrl: rawSlides[i].imageDataUrl }),
         })
-        const data = await res.json()
+        if (!res.ok) {
+          // Fallback silencieux si l'API échoue (ex: image trop grande)
+          cleanSlides.push({ ...rawSlides[i], cleanImageDataUrl: rawSlides[i].imageDataUrl })
+          continue
+        }
+        let data
+        try { data = await res.json() } catch {
+          cleanSlides.push({ ...rawSlides[i], cleanImageDataUrl: rawSlides[i].imageDataUrl })
+          continue
+        }
         cleanSlides.push({
           ...rawSlides[i],
-          cleanImageDataUrl: data.imageDataUrl,
+          cleanImageDataUrl: data.imageDataUrl ?? rawSlides[i].imageDataUrl,
         })
       }
 
@@ -47,7 +56,8 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: originalText, profileId }),
           })
-          const data = await res.json()
+          let data = {}
+          try { data = await res.json() } catch { /* fallback to original */ }
           result[profileId].push({
             cleanImageDataUrl: cleanSlides[i].cleanImageDataUrl,
             adaptedText: data.adapted ?? originalText,
