@@ -9,6 +9,6 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.js'],
   },
   optimizeDeps: {
-    exclude: ['pdfjs-dist'],
+    include: ['pdfjs-dist'],
   },
 })

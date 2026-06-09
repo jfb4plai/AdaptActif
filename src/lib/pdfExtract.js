@@ -1,15 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist'
+// Import Vite ?url — résout correctement en dev ET en production
+import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-// Worker PDF.js — nécessaire pour le parsing
-// Wrapped in try/catch car import.meta.url peut échouer dans l'environnement de test
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).toString()
-} catch {
-  // Environnement de test (Vitest/Node) — le worker n'est pas nécessaire
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
 
 /**
  * Charge un fichier PDF et retourne le document PDF.js

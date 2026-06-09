@@ -6,6 +6,7 @@ vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
   getDocument: vi.fn(),
 }))
+vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '' }))
 
 import { extractTextItems, pageToImageDataUrl } from '../lib/pdfExtract.js'
 
