@@ -2,6 +2,10 @@
 // Layout NBLM2PPTX : fond nettoyé en arrière-plan + blocs texte aux positions exactes
 import PptxGenJS from 'pptxgenjs'
 
+export function parseAdaptedText(text) {
+  return (text ?? '').split('\n').map((l) => l.trim().replace(/^[-•*#]+\s*/, '')).filter(Boolean)
+}
+
 const SLIDE_W = 13.33  // inches, 16:9
 const SLIDE_H = 7.5
 
