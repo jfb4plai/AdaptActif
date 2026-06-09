@@ -4,6 +4,7 @@ import { PROFILES } from '../lib/profileConfig.js'
 import AdvancedOptions from './AdvancedOptions.jsx'
 
 const PROFILE_DESCRIPTIONS = {
+  direct: 'Conversion PPTX sans modification — texte original conservé, aucune IA',
   dys: 'Police Arial, interligne 1.5, fond pastel, phrases simplifiées',
   tdah: 'Max 3 points essentiels, mots-clés en gras, mise en page épurée',
   falc: 'FALC strict : phrases ≤ 12 mots, vocabulaire contrôlé, Arial 14pt',

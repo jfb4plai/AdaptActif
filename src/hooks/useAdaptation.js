@@ -51,6 +51,16 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
             step: `Profil ${profileId.toUpperCase()} — slide ${i + 1}/${cleanSlides.length}...`,
           })
           const originalText = cleanSlides[i].textItems.map((t) => t.text).join('\n')
+          // Profil "direct" : aucune reformulation IA, texte original conservé
+          if (profileId === 'direct') {
+            result[profileId].push({
+              cleanImageDataUrl: cleanSlides[i].cleanImageDataUrl,
+              adaptedText: originalText,
+              originalText,
+            })
+            done++
+            continue
+          }
           const res = await fetch('/api/adapt-text', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

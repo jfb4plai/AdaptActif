@@ -44,6 +44,20 @@ Règles :
 - Format : liste de bullet points séparés par des sauts de ligne`,
   },
 
+  direct: {
+    label: 'PPTX direct',
+    font: { name: 'Calibri', size: 18, bold: false, italic: false },
+    lineSpacing: 1.15,
+    align: 'left',
+    bgColor: 'FFFFFF',
+    textColor: '000000',
+    maxBullets: null,
+    highContrast: false,
+    boldKeywords: false,
+    claudeModel: null,   // pas d'IA — conversion directe
+    claudePrompt: null,
+  },
+
   falc: {
     label: 'FALC',
     font: { name: 'Arial', size: 14, bold: false, italic: false },

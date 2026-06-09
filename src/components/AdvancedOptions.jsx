@@ -1,6 +1,7 @@
 // src/components/AdvancedOptions.jsx
 import { PROFILES } from '../lib/profileConfig.js'
 
+// "direct" n'a pas d'options à la carte (pas d'IA)
 const OPTIONS = {
   dys: [
     { key: 'reformulate', label: 'Reformulation IA du texte' },
@@ -36,10 +37,18 @@ export default function AdvancedOptions({ selectedProfiles, options, onChange })
     })
   }
 
+  // Profils qui ont des options configurables (hors "direct")
+  const configurableProfiles = selectedProfiles.filter((id) => OPTIONS[id])
+
   return (
     <div className="mt-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
       <h3 className="font-medium text-gray-700 mb-3">Options à la carte</h3>
-      {selectedProfiles.map((profileId) => (
+      {configurableProfiles.length === 0 && (
+        <p className="text-sm text-gray-400 italic">
+          Sélectionne au moins un profil DYS, TDAH ou FALC pour accéder aux options.
+        </p>
+      )}
+      {configurableProfiles.map((profileId) => (
         <div key={profileId} className="mb-4">
           <p className="text-sm font-semibold text-[#0a9370] mb-2">{PROFILES[profileId].label}</p>
           <div className="space-y-1">
