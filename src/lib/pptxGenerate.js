@@ -1,100 +1,81 @@
 // src/lib/pptxGenerate.js
+// Layout NBLM2PPTX : fond nettoyé en arrière-plan + blocs texte aux positions exactes
 import PptxGenJS from 'pptxgenjs'
 
+const SLIDE_W = 13.33  // inches, 16:9
+const SLIDE_H = 7.5
+
 /**
- * Parse le texte adapté en bullet points
- * @param {string} text
- * @returns {string[]}
+ * Convertit une coordonnée box_2d (0-1000) en inches
  */
-export function parseAdaptedText(text) {
-  return text
-    .split('\n')
-    .map((line) => line.trim().replace(/^[-•*#]+\s*/, ''))
-    .filter((line) => line.length > 0)
+function box2dToInches(box_2d) {
+  const [ymin, xmin, ymax, xmax] = box_2d
+  return {
+    x: (xmin / 1000) * SLIDE_W,
+    y: (ymin / 1000) * SLIDE_H,
+    w: Math.max(((xmax - xmin) / 1000) * SLIDE_W, 0.5),
+    h: Math.max(((ymax - ymin) / 1000) * SLIDE_H, 0.3),
+  }
 }
 
 /**
- * Génère un fichier PPTX pour un profil donné
- * Layout : image originale à gauche (référence), texte adapté éditable à droite
- * @param {Array<{ cleanImageDataUrl, adaptedText }>} slides
- * @param {object} profile - résultat de getProfile()
- * @param {string} profileLabel - ex: 'DYS'
- * @returns {Promise<void>} déclenche le téléchargement
+ * Génère un PPTX avec fond nettoyé + texte adapté aux positions originales
+ * @param {Array<{ cleanImageDataUrl, textBlocks, adaptedText }>} slides
+ * @param {object} profile
+ * @param {string} profileLabel
  */
 export async function generatePptx(slides, profile, profileLabel) {
   const pptx = new PptxGenJS()
-  pptx.defineLayout({ name: 'WIDESCREEN', width: 13.33, height: 7.5 })
+  pptx.defineLayout({ name: 'WIDESCREEN', width: SLIDE_W, height: SLIDE_H })
   pptx.layout = 'WIDESCREEN'
 
   for (const slide of slides) {
-    let bullets = parseAdaptedText(slide.adaptedText)
-    if (profile.maxBullets) {
-      bullets = bullets.slice(0, profile.maxBullets)
-    }
-
     const s = pptx.addSlide()
 
-    // Fond de couleur du profil (pas l'image — évite le surtexte illisible)
-    s.background = { color: profile.bgColor ?? 'FFFFFF' }
-
-    // Image originale à gauche — référence visuelle, non éditable
+    // Fond nettoyé (sans texte) en pleine slide
     s.addImage({
       data: slide.cleanImageDataUrl,
-      x: 0.2,
-      y: 0.2,
-      w: 5.8,
-      h: 7.1,
+      x: 0, y: 0,
+      w: '100%', h: '100%',
     })
 
-    // Ligne de séparation verticale
-    s.addShape(pptx.ShapeType.line, {
-      x: 6.2,
-      y: 0.2,
-      w: 0,
-      h: 7.1,
-      line: { color: 'CCCCCC', width: 1 },
-    })
+    const hasBlocks = slide.textBlocks && slide.textBlocks.length > 0
 
-    // En-tête profil
-    s.addText(profileLabel, {
-      x: 6.4,
-      y: 0.2,
-      w: 6.7,
-      h: 0.45,
-      fontFace: profile.font?.name ?? 'Arial',
-      fontSize: 10,
-      color: '0a9370',
-      bold: true,
-    })
+    if (hasBlocks) {
+      // Mode NBLM2PPTX : chaque bloc à sa position exacte
+      for (const block of slide.textBlocks) {
+        if (!block.text?.trim() || !block.box_2d) continue
+        const pos = box2dToInches(block.box_2d)
+        const cleanColor = (block.color ?? profile.textColor ?? '000000').replace('#', '')
 
-    // Zone texte adapté — éditable dans PowerPoint
-    if (bullets.length > 0) {
-      s.addText(
-        bullets.map((b) => ({ text: b, options: { bullet: true, breakLine: true } })),
-        {
-          x: 6.4,
-          y: 0.75,
-          w: 6.7,
-          h: 6.5,
+        s.addText(block.text, {
+          ...pos,
           fontFace: profile.font?.name ?? 'Arial',
-          fontSize: profile.font?.size ?? 16,
-          color: profile.textColor ?? '1A1A1A',
-          align: profile.align ?? 'left',
-          lineSpacingMultiple: profile.lineSpacing ?? 1.5,
+          fontSize: block.font_size_pt ?? profile.font?.size ?? 16,
+          color: cleanColor,
+          bold: block.font_weight === 'bold' || profile.font?.bold,
+          italic: block.font_style === 'italic',
+          align: block.text_align ?? profile.align ?? 'left',
           valign: 'top',
           wrap: true,
+        })
+      }
+    } else if (slide.adaptedText?.trim()) {
+      // Fallback : pas de blocs → zone texte unique sur la moitié inférieure
+      const lines = slide.adaptedText.split('\n').filter((l) => l.trim())
+      if (profile.maxBullets) lines.splice(profile.maxBullets)
+      s.addText(
+        lines.map((l) => ({ text: l.replace(/^[-•*#]+\s*/, ''), options: { bullet: true } })),
+        {
+          x: 0.4, y: 4.0, w: 12.5, h: 3.2,
+          fontFace: profile.font?.name ?? 'Arial',
+          fontSize: profile.font?.size ?? 16,
+          color: profile.textColor ?? '000000',
+          align: profile.align ?? 'left',
+          wrap: true,
+          valign: 'top',
         }
       )
-    } else {
-      // Slide sans texte extrait (image décorative) — zone vide mais éditable
-      s.addText('', {
-        x: 6.4,
-        y: 0.75,
-        w: 6.7,
-        h: 6.5,
-        fontFace: profile.font?.name ?? 'Arial',
-        fontSize: profile.font?.size ?? 16,
-      })
     }
   }
 

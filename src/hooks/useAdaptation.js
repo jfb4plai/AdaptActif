@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 
-export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {}) {
+export function useAdaptation(rawSlides, selectedProfiles) {
   const [adaptedSlides, setAdaptedSlides] = useState({})
   const [progress, setProgress] = useState({ current: 0, total: 0, step: '' })
   const [adapting, setAdapting] = useState(false)
@@ -10,72 +10,103 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
     setAdapting(true)
     setError(null)
     const total = rawSlides.length * (1 + selectedProfiles.length)
-    setProgress({ current: 0, total, step: 'Suppression du texte des images...' })
+    setProgress({ current: 0, total, step: 'Extraction du texte et nettoyage des images...' })
 
     try {
-      // Step 1: remove-bg for each slide
-      const cleanSlides = []
+      // Étape 1 : remove-bg + OCR en parallèle pour chaque slide (comme NBLM2PPTX)
+      const processedSlides = []
       for (let i = 0; i < rawSlides.length; i++) {
-        setProgress({ current: i, total, step: `Slide ${i + 1}/${rawSlides.length} — nettoyage image...` })
-        const res = await fetch('/api/remove-bg', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageDataUrl: rawSlides[i].imageDataUrl }),
+        setProgress({
+          current: i,
+          total,
+          step: `Slide ${i + 1}/${rawSlides.length} — extraction texte + nettoyage...`,
         })
-        if (!res.ok) {
-          // Fallback silencieux si l'API échoue (ex: image trop grande)
-          cleanSlides.push({ ...rawSlides[i], cleanImageDataUrl: rawSlides[i].imageDataUrl })
-          continue
+        try {
+          const res = await fetch('/api/remove-bg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageDataUrl: rawSlides[i].imageDataUrl }),
+          })
+          const data = res.ok ? await res.json() : {}
+          processedSlides.push({
+            ...rawSlides[i],
+            cleanImageDataUrl: data.imageDataUrl ?? rawSlides[i].imageDataUrl,
+            textBlocks: data.textBlocks ?? [],  // blocs avec positions box_2d
+          })
+        } catch {
+          processedSlides.push({
+            ...rawSlides[i],
+            cleanImageDataUrl: rawSlides[i].imageDataUrl,
+            textBlocks: [],
+          })
         }
-        let data
-        try { data = await res.json() } catch {
-          cleanSlides.push({ ...rawSlides[i], cleanImageDataUrl: rawSlides[i].imageDataUrl })
-          continue
-        }
-        cleanSlides.push({
-          ...rawSlides[i],
-          cleanImageDataUrl: data.imageDataUrl ?? rawSlides[i].imageDataUrl,
-          // Texte extrait par Gemini Vision — prioritaire sur PDF.js (NotebookLM n'a pas de couche texte)
-          extractedText: data.extractedText ?? null,
-        })
       }
 
-      // Step 2: adapt-text for each profile × slide
+      // Étape 2 : adaptation Claude par profil × slide
       const result = {}
       let done = rawSlides.length
 
       for (const profileId of selectedProfiles) {
         result[profileId] = []
-        for (let i = 0; i < cleanSlides.length; i++) {
+        for (let i = 0; i < processedSlides.length; i++) {
           setProgress({
             current: done,
             total,
-            step: `Profil ${profileId.toUpperCase()} — slide ${i + 1}/${cleanSlides.length}...`,
+            step: `Profil ${profileId.toUpperCase()} — slide ${i + 1}/${processedSlides.length}...`,
           })
-          // Priorité : texte extrait par Gemini Vision > texte PDF.js (souvent vide sur NotebookLM)
-          const pdfText = cleanSlides[i].textItems.map((t) => t.text).join('\n')
-          const originalText = cleanSlides[i].extractedText || pdfText
-          // Profil "direct" : aucune reformulation IA, texte original conservé
+
+          const slide = processedSlides[i]
+
+          // Profil direct : aucune adaptation IA
           if (profileId === 'direct') {
             result[profileId].push({
-              cleanImageDataUrl: cleanSlides[i].cleanImageDataUrl,
-              adaptedText: originalText,
-              originalText,
+              cleanImageDataUrl: slide.cleanImageDataUrl,
+              textBlocks: slide.textBlocks,          // blocs originaux
+              adaptedText: slide.textBlocks.map((b) => b.text).join('\n'),
             })
             done++
             continue
           }
-          const res = await fetch('/api/adapt-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: originalText, profileId }),
-          })
-          let data = {}
-          try { data = await res.json() } catch { /* fallback to original */ }
+
+          // Si pas de blocs OCR : fallback texte PDF.js
+          const hasBlocks = slide.textBlocks.length > 0
+          const fallbackText = slide.textItems?.map((t) => t.text).join('\n') ?? ''
+
+          let adaptedBlocks = null
+          let adaptedText = fallbackText
+
+          try {
+            const body = hasBlocks
+              ? { textBlocks: slide.textBlocks, profileId }
+              : { text: fallbackText || '(slide sans texte)', profileId }
+
+            const res = await fetch('/api/adapt-text', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            })
+            const data = res.ok ? await res.json() : {}
+
+            if (data.adaptedBlocks) {
+              adaptedBlocks = data.adaptedBlocks  // [{index, text}]
+              adaptedText = data.adaptedBlocks.map((b) => b.text).join('\n')
+            } else if (data.adapted) {
+              adaptedText = data.adapted
+            }
+          } catch { /* fallback silencieux */ }
+
+          // Fusionner les positions originales avec le texte adapté
+          const mergedBlocks = hasBlocks
+            ? slide.textBlocks.map((block, idx) => ({
+                ...block,
+                text: adaptedBlocks?.[idx]?.text ?? block.text,
+              }))
+            : []
+
           result[profileId].push({
-            cleanImageDataUrl: cleanSlides[i].cleanImageDataUrl,
-            adaptedText: data.adapted ?? originalText,
-            originalText,
+            cleanImageDataUrl: slide.cleanImageDataUrl,
+            textBlocks: mergedBlocks,
+            adaptedText,
           })
           done++
         }
@@ -93,7 +124,10 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
     setAdaptedSlides((prev) => {
       const updated = { ...prev }
       updated[profileId] = [...prev[profileId]]
-      updated[profileId][slideIndex] = { ...updated[profileId][slideIndex], adaptedText: newText }
+      updated[profileId][slideIndex] = {
+        ...updated[profileId][slideIndex],
+        adaptedText: newText,
+      }
       return updated
     })
   }, [])

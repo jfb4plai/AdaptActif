@@ -52,9 +52,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { text, profileId } = req.body
-  if (!text || !profileId) {
-    return res.status(400).json({ error: 'text et profileId requis' })
+  // textBlocks : array de { text, box_2d, font_size_pt, ... }
+  // text : fallback texte simple (rétrocompatibilité)
+  const { text, textBlocks, profileId } = req.body
+  if ((!text && !textBlocks) || !profileId) {
+    return res.status(400).json({ error: 'text/textBlocks et profileId requis' })
   }
   if (!PROMPTS[profileId]) {
     return res.status(400).json({ error: `Profil inconnu : ${profileId}` })
@@ -67,15 +69,51 @@ export default async function handler(req, res) {
 
   try {
     const client = new Anthropic({ apiKey })
+
+    // Mode blocs : adapter chaque bloc séparément en préservant l'index
+    if (textBlocks && textBlocks.length > 0) {
+      const numbered = textBlocks
+        .map((b, i) => `[${i}] ${b.text}`)
+        .join('\n---\n')
+
+      const message = await client.messages.create({
+        model: MODELS[profileId],
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: `${PROMPTS[profileId]}
+
+Tu dois adapter CHAQUE bloc de texte numéroté ci-dessous.
+Retourne EXACTEMENT le même nombre de blocs, dans le même ordre, au format JSON :
+[{"index": 0, "text": "..."}, {"index": 1, "text": "..."}, ...]
+Ne fusionne pas les blocs. Ne saute pas de bloc.
+
+Blocs à adapter :
+${numbered}`,
+        }],
+      })
+
+      let adaptedBlocks
+      try {
+        const raw = message.content[0].text.trim()
+        const jsonMatch = raw.match(/\[[\s\S]*\]/)
+        adaptedBlocks = JSON.parse(jsonMatch ? jsonMatch[0] : raw)
+      } catch {
+        // Fallback : retourner les blocs originaux
+        adaptedBlocks = textBlocks.map((b, i) => ({ index: i, text: b.text }))
+      }
+
+      return res.status(200).json({ adaptedBlocks })
+    }
+
+    // Mode texte simple (fallback / profil direct)
     const message = await client.messages.create({
       model: MODELS[profileId],
       max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `${PROMPTS[profileId]}\n\nTexte à adapter :\n${text}`,
-        },
-      ],
+      messages: [{
+        role: 'user',
+        content: `${PROMPTS[profileId]}\n\nTexte à adapter :\n${text}`,
+      }],
     })
 
     const adapted = message.content[0].text.trim()
