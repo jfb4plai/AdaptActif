@@ -35,6 +35,8 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
         cleanSlides.push({
           ...rawSlides[i],
           cleanImageDataUrl: data.imageDataUrl ?? rawSlides[i].imageDataUrl,
+          // Texte extrait par Gemini Vision — prioritaire sur PDF.js (NotebookLM n'a pas de couche texte)
+          extractedText: data.extractedText ?? null,
         })
       }
 
@@ -50,7 +52,9 @@ export function useAdaptation(rawSlides, selectedProfiles, advancedOptions = {})
             total,
             step: `Profil ${profileId.toUpperCase()} — slide ${i + 1}/${cleanSlides.length}...`,
           })
-          const originalText = cleanSlides[i].textItems.map((t) => t.text).join('\n')
+          // Priorité : texte extrait par Gemini Vision > texte PDF.js (souvent vide sur NotebookLM)
+          const pdfText = cleanSlides[i].textItems.map((t) => t.text).join('\n')
+          const originalText = cleanSlides[i].extractedText || pdfText
           // Profil "direct" : aucune reformulation IA, texte original conservé
           if (profileId === 'direct') {
             result[profileId].push({
