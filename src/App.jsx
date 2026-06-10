@@ -8,7 +8,7 @@ import { useAdaptation } from './hooks/useAdaptation.js'
 
 export default function App() {
   const [screen, setScreen] = useState('upload')
-  const [selectedProfiles, setSelectedProfiles] = useState(['dys'])
+  const [selectedProfiles, setSelectedProfiles] = useState(['direct'])
   const [advancedOptions, setAdvancedOptions] = useState({})
 
   const { slides: rawSlides, parsing, error: parseError, parsePdf } = usePdfParsing()
