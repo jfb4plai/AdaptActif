@@ -52,13 +52,18 @@ export async function generatePptx(slides, profile, profileLabel) {
         const color = (block.color ?? profile.textColor ?? '000000').replace('#', '')
         const runs = parseMarkdownLine(block.text)
 
+        // Heuristique police : titre (>20pt) → Georgia, corps → Calibri
+        const fontSize = block.font_size_pt ?? 16
+        const fontFace = fontSize > 20 ? 'Georgia' : 'Calibri'
+
         s.addText(runs, {
           ...pos,
-          fontFace: profile.font?.name ?? 'Arial',
-          fontSize: block.font_size_pt ?? profile.font?.size ?? 16,
+          fontFace,
+          fontSize,
           color,
+          bold: block.font_weight === 'bold',
           italic: block.font_style === 'italic',
-          align: block.text_align ?? profile.align ?? 'left',
+          align: block.text_align ?? 'left',
           valign: 'top',
           wrap: true,
           margin: 0,
