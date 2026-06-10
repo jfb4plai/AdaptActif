@@ -1,12 +1,10 @@
-// api/remove-bg.js
-// Deux appels Gemini en parallèle :
-// 1. gemini-2.5-flash-image  → efface le texte, retourne fond propre
-// 2. gemini-2.5-flash        → OCR structuré avec positions box_2d
+// api/remove-bg.js — pipeline NBLM2PPTX exact
+// Modèles : gemini-2.5-flash-image (suppression texte) + gemini-2.5-flash-lite (OCR positions)
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-async function fetchWithRetry(url, options, maxRetries = 4) {
-  const delays = [2000, 4000, 8000, 16000]
+async function fetchWithRetry(url, options, maxRetries = 5) {
+  const delays = [2000, 4000, 8000, 16000, 32000]
   for (let i = 0; i < maxRetries; i++) {
     try {
       const res = await fetch(url, options)
@@ -27,16 +25,22 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
   }
 }
 
+// Supprime le texte de l'image — modèle exact de NBLM2PPTX
 async function removeTextFromImage(base64, mimeType, apiKey) {
-  const url = `${BASE}/gemini-2.0-flash-exp:generateContent?key=${apiKey}`
+  const url = `${BASE}/gemini-2.5-flash-image:generateContent?key=${apiKey}`
   const payload = {
     contents: [{
       parts: [
-        { text: 'Remove all text, labels, and numbers from this image while perfectly preserving the background colors, shapes, and visual elements. Return only the cleaned image.' },
+        { text: 'Remove all text from this image while preserving the background.' },
         { inlineData: { mimeType, data: base64 } },
       ],
     }],
-    generationConfig: { responseModalities: ['IMAGE'] },
+    generationConfig: {
+      temperature: 0.4,
+      topK: 32,
+      topP: 1,
+      maxOutputTokens: 4096,
+    },
   }
   const data = await fetchWithRetry(url, {
     method: 'POST',
@@ -48,22 +52,23 @@ async function removeTextFromImage(base64, mimeType, apiKey) {
   return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
 }
 
+// OCR avec positions box_2d — modèle exact de NBLM2PPTX
 async function ocrWithPositions(base64, mimeType, apiKey) {
-  const url = `${BASE}/gemini-2.5-flash:generateContent?key=${apiKey}`
+  const url = `${BASE}/gemini-2.5-flash-lite:generateContent?key=${apiKey}`
   const payload = {
     contents: [{
       parts: [
         {
-          text: `Analyze this presentation slide image and extract ALL text blocks with their exact positions.
-For each text block return:
-- text: exact text content (preserve line breaks with \\n)
-- box_2d: bounding box [ymin, xmin, ymax, xmax] in 0-1000 coordinate system
-- font_size_pt: estimated font size in points
+          text: `Analyze this image and extract all text blocks.
+For each text block, provide:
+- text: exact text content
+- box_2d: bounding box as [ymin, xmin, ymax, xmax] in 0-1000 coordinate system
+- font_size_pt: font size in points
 - font_weight: "normal" or "bold"
 - font_style: "normal" or "italic"
 - text_align: "left", "center", or "right"
 - color: hex color WITHOUT # (e.g. "000000")
-Return a JSON array only, no explanation.`,
+Return as JSON array only.`,
         },
         { inlineData: { mimeType, data: base64 } },
       ],
@@ -112,7 +117,7 @@ export default async function handler(req, res) {
   const mimeType = `image/${match[1]}`
   const base64 = match[2]
 
-  // Deux appels en parallèle comme NBLM2PPTX
+  // Deux appels en parallèle — exactement comme NBLM2PPTX
   const [bgResult, ocrResult] = await Promise.allSettled([
     removeTextFromImage(base64, mimeType, apiKey),
     ocrWithPositions(base64, mimeType, apiKey),
@@ -120,11 +125,13 @@ export default async function handler(req, res) {
 
   const cleanImageDataUrl = bgResult.status === 'fulfilled'
     ? bgResult.value
-    : imageDataUrl  // fallback : image originale
+    : imageDataUrl
 
-  const textBlocks = ocrResult.status === 'fulfilled'
-    ? ocrResult.value
-    : []
+  const textBlocks = ocrResult.status === 'fulfilled' ? ocrResult.value : []
+
+  if (bgResult.status === 'rejected') {
+    console.error('remove-bg failed:', bgResult.reason?.message)
+  }
 
   return res.status(200).json({
     imageDataUrl: cleanImageDataUrl,

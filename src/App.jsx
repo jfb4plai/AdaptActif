@@ -41,12 +41,11 @@ export default function App() {
         )}
         {screen === 'profile' && (
           <ProfileScreen
-            selectedProfiles={selectedProfiles}
-            onProfileChange={setSelectedProfiles}
-            advancedOptions={advancedOptions}
-            onAdvancedChange={setAdvancedOptions}
             onBack={() => setScreen('upload')}
-            onNext={handleStartAdaptation}
+            onNext={(profiles) => {
+              setSelectedProfiles(profiles)
+              handleStartAdaptation()
+            }}
           />
         )}
         {screen === 'preview' && (
