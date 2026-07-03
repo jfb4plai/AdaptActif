@@ -1,16 +1,33 @@
-# React + Vite
+# AdaptActif — GELÉ (absorbé par Adaptateur AUs)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **Statut : développement gelé depuis juillet 2026.**
+> Fonctions reprises par **Adaptateur AUs** (`projets/au-convertisseur`,
+> https://adaptateur-aus.vercel.app), l'app canonique PLAI d'accessibilité documentaire.
 
-Currently, two official plugins are available:
+## Ce que faisait AdaptActif
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Adaptation de supports de cours PDF par profils d'élèves :
 
-## React Compiler
+- Import PDF découpé en diapositives (`usePdfParsing`)
+- Sélection de profils d'adaptation (écran Profils)
+- Adaptation IA du texte (`api/adapt-text.js`)
+- Suppression d'arrière-plan d'images (`api/remove-bg.js`)
+- Prévisualisation puis export
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## À reprendre dans Adaptateur AUs (backlog de consolidation)
 
-## Expanding the ESLint configuration
+| Fonction | Intérêt | État dans Adaptateur AUs |
+|---|---|---|
+| Adaptation par profils d'élèves multiples | Différenciation en un passage | Absent — à porter |
+| Suppression d'arrière-plan (`remove-bg`) | Nettoyage d'images de scans | Absent — à évaluer |
+| Découpage PDF en diapositives | Traitement de présentations | Partiel (`pdf-vision`) |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Raison du gel
+
+Quatre apps couvraient « rendre un document accessible » (AdaptActif, AccessDoc,
+Adaptateur AUs, Narration DYS). Pour un enseignant, quatre outils proches = aucun outil.
+Adaptateur AUs est la plus aboutie (56 commits, 7 fonctions API, score d'accessibilité
+déterministe, alignée sur le cadre AU FWB/PLAI) — c'est elle qui absorbe.
+Narration DYS reste indépendante (fonction distincte : lecture audio).
+
+Plan complet : `claude-workspace/memory/consolidation-accessibilite-plan.md`
